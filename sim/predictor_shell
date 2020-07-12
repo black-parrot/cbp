@@ -1,0 +1,18 @@
+///////////////////////////////////////////////////////////////////////
+//  Copyright 2015 Samsung Austin Semiconductor, LLC.                //
+///////////////////////////////////////////////////////////////////////
+
+#ifndef _PREDICTOR_H_
+#define _PREDICTOR_H_
+
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+#include <inttypes.h>
+#include <math.h>
+#include "utils.h"
+#include "bt9.h"
+#include "bt9_reader.h"
+
+
+#endif
