@@ -1,0 +1,59 @@
+#*************************************************************
+# (C) COPYRIGHT 2016 Samsung Electronics
+# 
+#*************************************************************
+#
+
+For CBP2016, we have tried to preserve structure and organization of the CBP2014 framework. Most the scripts have kept the same names and directory structure is maintained. 
+
+For CBP2016 we have 200 short traces and 23 long traces. Out of 200 Short traces 139 are server and 61 are mobile traces. Long traces have 19 Mobile and 4 server benchmarks.These traces are provided in BT9 format along with a BT9 reader and user manual.
+
+BT9 Reader code needs Boost installed on the system. We tested this framework with Boost version 1.49, gcc4.7.4 and glibc-2.12-1.132.el6.x86_64
+
+
+
+* BT9 File Format
+  - Header section: 
+    <key>: <value>
+  - Node table
+    NODE <id> <virtual_address> <physical_address> <opcode> <size> class: <br_class> behavior: <br_behavior> taken_cnt: <taken_cnt> tgt_cnt: <target_cnt> # mnemonic: "<assembly_code>"
+  - Edge table
+    EDGE <id> <src_id> <dest_id> <taken> <br_virt_target> <br_phy_target> <inst_cnt> traverse_cnt: <traverse_cnt>
+  - Branch sequence list
+    <edge_id>
+    <edge_id>
+    ...
+    EOF
+
+
+
+
+
+Directory Structure:-
+
+traces: Location of all the trace files . Traces have been renamed using the mapping
+bin: location of the predictor and BT9 executable
+scripts: Location of the scripts to automate running predictor on all the traces in trace file and calculate the average MPKI numbers
+results : Each subdirectory contains individual file for each trace with mpki number, instruction count , branch count etc.
+
+NOTE: When you download the simulation infrastructure the traces directory will only contain four test traces. You will need to download
+the actual traces separately and copy the files into the traces directory.
+
+
+bench_list.pl: The file bench_list contains the list of all benchmarks . For CBP 2016 we are classifying the benchmarks in 4 categories 
+(suite: SHORT_SERVER, SHORT_MOBILE, LONG_SERVER, LONG_MOBILE, all)
+
+
+runall.pl: Script to run all the benchmarks:
+./runall.pl -s <path to the predictor executable>  -w <workloads> -f <number of parallel threads> -d <location of result directory> 
+./runall.pl -s ../sim/predictor -w all -f 8 -d ../results/MYRESULTS
+
+To run only the short list of traces that are included in the cbp2016.tar.gz file:
+ ./runall.pl -s ../sim/predictor -w temp -f 8 -d ../results/MYRESULTS
+
+getdata.pl: Script to get AMEAN of MPKI for all the benchmarks:
+./getdata.pl -d ../results/<RESULTS_DIR_NAME>
+
+doit.sh: Lists working examples, check out ../scripts/doit.sh
+
+
