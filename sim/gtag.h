@@ -1,3 +1,4 @@
+
 ///////////////////////////////////////////////////////////////////////
 ////  Copyright 2015 Samsung Austin Semiconductor, LLC.                //
 /////////////////////////////////////////////////////////////////////////
@@ -17,7 +18,8 @@
 #define PHT_CTR_MAX  3
 #define PHT_CTR_INIT 2
 
-#define HIST_LEN   14
+#define HIST_LEN   11
+#define TAG_LEN  6
 
 //NOTE competitors are allowed to change anything in this file include the following two defines
 //ver2 #define FILTER_UPDATES_USING_BTB     0     //if 1 then the BTB updates are filtered for a given branch if its marker is not btbDYN
@@ -33,9 +35,12 @@ class PREDICTOR{
  private:
   UINT32  ghr;           // global history register
   UINT32  *pht;          // pattern history table
+  UINT32  *pht2;         //
+  UINT32  tagLength;     // tag length
   UINT32  historyLength; // history length
-  UINT32  numPhtEntries; // entries in pht 
-
+  UINT32  numPhtEntries; // entries in pht
+  UINT32  *tags;
+  
  public:
 
 
@@ -69,13 +74,16 @@ class PREDICTOR{
 PREDICTOR::PREDICTOR(void){
 
   historyLength    = HIST_LEN;
+  tagLength        = (1 << TAG_LEN);
   ghr              = 0;
   numPhtEntries    = (1<< HIST_LEN);
 
-  pht = new UINT32[numPhtEntries];
+  pht = new UINT32[numPhtEntries]; // Secondary Predictor 2-bit counters
+  pht2 = new UINT32[numPhtEntries]; // Default Predictor 2-bit counters
+  tags = new UINT32[numPhtEntries]; // Tags
 
   for(UINT32 ii=0; ii< numPhtEntries; ii++){
-    pht[ii]=PHT_CTR_INIT; 
+    pht2[ii]=PHT_CTR_INIT; // Initialize default predictor 2-bit counters 
   }
   
 }
@@ -114,16 +122,25 @@ PREDICTOR::PREDICTOR(void){
 //NOTE contestants are not allowed to use the btb* information from ver2 of the simulation infrastructure. Interface to this function CAN NOT be changed.
 bool   PREDICTOR::GetPrediction(UINT64 PC){
 
-  UINT32 phtIndex   = PC % (numPhtEntries);
-  UINT32 phtCounter = pht[phtIndex];
-
+  UINT32 phtIndex   = (PC^ghr) % (numPhtEntries); // Secondary Predictor Index - Gshare1
+  UINT32 phtIndex2 = (PC) % (numPhtEntries); // Default Predictor - Bimodal
+  UINT32 phtCounter = pht[phtIndex]; // Secondary Predictor Counter
+  UINT32 phtCounter2 = pht2[phtIndex2]; // Default Predictor Counter
+  UINT32 tag = (PC) % (tagLength);
+  
 //  printf(" ghr: %x index: %x counter: %d prediction: %d\n", ghr, phtIndex, phtCounter, phtCounter > PHT_CTR_MAX/2);
-
-  if(phtCounter > (PHT_CTR_MAX/2)){ 
-    return TAKEN; 
-  }
-  else{
-    return NOT_TAKEN; 
+  if(tag == tags[phtIndex]) { // If the Gshare3 Tag matches the tag in the Secondary Predictor at Gshare1 index
+    if(phtCounter > (PHT_CTR_MAX/2)){ // Produce appropriate prediction from 2-bc in secondary predictor
+      return TAKEN;
+    } else {
+      return NOT_TAKEN;
+    }
+  } else { // No tag hit
+    if(phtCounter2 > (PHT_CTR_MAX/2)){ // Use appropriate default prediction from appropriate counter
+      return TAKEN;
+    } else {
+      return NOT_TAKEN; 
+    }
   }
 }
 
@@ -160,20 +177,47 @@ bool   PREDICTOR::GetPrediction(UINT64 PC){
 //NOTE contestants are not allowed to use the btb* information from ver2 of the simulation infrastructure. Interface to this function CAN NOT be changed.
 void  PREDICTOR::UpdatePredictor(UINT64 PC, OpType opType, bool resolveDir, bool predDir, UINT64 branchTarget){
 
-  UINT32 phtIndex   = PC % (numPhtEntries);
-  UINT32 phtCounter = pht[phtIndex];
-
-  if(resolveDir == TAKEN){
-    pht[phtIndex] = SatIncrement(phtCounter, PHT_CTR_MAX);
-  }else{
-    pht[phtIndex] = SatDecrement(phtCounter);
+  UINT32 phtIndex   = (PC^ghr) % (numPhtEntries); // Secondary Predictor Index - Gshare1
+  UINT32 phtIndex2 = (PC) % (numPhtEntries); // Default Predictor - Bimodal
+  UINT32 phtCounter = pht[phtIndex]; // Secondary Predictor Counter
+  UINT32 phtCounter2 = pht2[phtIndex2]; // Default Predictor Counter
+  UINT32 tag = (PC) % (tagLength); // Tag - Gshare3
+  
+  if(tag == tags[phtIndex]) { // If Secondary Predictor was used
+    if(resolveDir == TAKEN) { // If Branch Outcome was taken
+      pht[phtIndex] = SatIncrement(phtCounter, PHT_CTR_MAX); // Increment appropriate counter in secondary predictor
+      if((phtCounter <= (PHT_CTR_MAX/2)) & (phtCounter2 <= (PHT_CTR_MAX/2))) { // If both secondary and default incorrectly predicted NOT TAKEN
+	pht2[phtIndex2] = SatIncrement(phtCounter2, PHT_CTR_MAX); // Increment appropriate counter in default predictor
+      } // else dont update default predictor
+    }else { // If Branch Outcome was not taken
+      pht[phtIndex] = SatDecrement(phtCounter); // Decrement appropriate counter in secondary predictor
+      if((phtCounter > (PHT_CTR_MAX/2)) & (phtCounter2 > (PHT_CTR_MAX/2))) { // If both secondary and default incorrectly predicted TAKEN
+	pht2[phtIndex2] = SatDecrement(phtCounter2); // Decrement appropriate counter in default predictor
+      } // else dont update default predictor
+    }
+  } else { // If Default Predictor was used
+    if(resolveDir == TAKEN) { // If Branch Outcome was taken
+      if(phtCounter2 > (PHT_CTR_MAX/2)) { // Update appropriate counter if correctly predicted TAKEN
+	pht2[phtIndex2] = SatIncrement(phtCounter2, PHT_CTR_MAX);
+      } else { // Otherwise add tag to secondary predictor and initialize two bit counter to WEAKLY TAKEN
+        tags[phtIndex] = tag;
+	pht[phtIndex] = 2;
+      }
+    }else { // If Branch outcome was NOT TAKEN
+      if(phtCounter2 > (PHT_CTR_MAX/2)) { // Update appropraite default predicor counter if correctly predicted NOT TAKEN
+	pht2[phtIndex2] = SatDecrement(phtCounter2);
+      } else { // Otherwise add tag to secondary predictor and initialize two bit counter to WEAKLY NOT TAKEN
+	tags[phtIndex] = tag;
+	pht[phtIndex] = 1;
+      }
+    }
   }
-
+  
   // update the GHR
   ghr = (ghr << 1);
-
+  
   if(resolveDir == TAKEN){
-    ghr++; 
+    ghr++;
   }
 }
 

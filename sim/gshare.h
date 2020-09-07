@@ -162,7 +162,6 @@ void  PREDICTOR::UpdatePredictor(UINT64 PC, OpType opType, bool resolveDir, bool
 
   UINT32 phtIndex   = (PC^ghr) % (numPhtEntries);
   UINT32 phtCounter = pht[phtIndex];
-
   if(resolveDir == TAKEN){
     pht[phtIndex] = SatIncrement(phtCounter, PHT_CTR_MAX);
   }else{

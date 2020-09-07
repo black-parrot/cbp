@@ -146,7 +146,7 @@ int main(int argc, char* argv[]){
 //ver2     UINT64 btb_atsf_cond_branch_instruction_counter=0;
 //ver2     UINT64 btb_dyn_cond_branch_instruction_counter=0;
 //ver2     UINT64 btb_miss_cond_branch_instruction_counter=0;
-           UINT64 uncond_branch_instruction_counter=0;
+    UINT64 uncond_branch_instruction_counter=0;
 
 //ver2    ///////////////////////////////////////////////
 //ver2    // model simple branch marking structure
@@ -359,7 +359,7 @@ int main(int argc, char* argv[]){
       printf("  NUM_BR                      \t : %10llu",   branch_instruction_counter-1); //JD2_2_2016 NOTE there is a dummy branch at the beginning of the trace...
       printf("  NUM_UNCOND_BR               \t : %10llu",   uncond_branch_instruction_counter);
       printf("  NUM_CONDITIONAL_BR          \t : %10llu",   cond_branch_instruction_counter);
-      printf("  BR_PRED_ACCURACY            \t : %10.4f",  100.0 - (100.0*(double)(numMispred)/(double)(branch_instructio)n_counter));
+      printf("  BR_PRED_ACCURACY            \t : %10.4f",  100.0 - (100.0*(double)(numMispred)/(double)(branch_instruction_counter)));
 //ver2      printf("  NUM_CONDITIONAL_BR_BTB_MISS \t : %10llu",   btb_miss_cond_branch_instruction_counter);
 //ver2      printf("  NUM_CONDITIONAL_BR_BTB_ANSF \t : %10llu",   btb_ansf_cond_branch_instruction_counter);
 //ver2      printf("  NUM_CONDITIONAL_BR_BTB_ATSF \t : %10llu",   btb_atsf_cond_branch_instruction_counter);
